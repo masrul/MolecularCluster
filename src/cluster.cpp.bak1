@@ -1,0 +1,197 @@
+/**
+ * Author      : Masrul Huda (mail2masrul@gmail.com)
+ * Host        : iMacPro@Swalm
+ * Created     : Tuesday Jul 05, 2022 10:01:02 CDT
+ */
+
+#include "gmx_traj.hpp"
+#include <vector>
+#include<map>
+#include <cmath>
+#include <iostream>
+
+
+class Cluster {
+public:
+    std::string molecule_name;
+    float rcut=0.35; // nm 
+    Cluster(std::string _molecule_name):molecule_name(_molecule_name){};
+    void run(GMXTraj&);
+    std::vector<int> nodes;
+    std::vector<std::vector<int>> edges; 
+
+private:
+    void _create_edges(GMXTraj&);
+    void _find_connected_component();
+};
+
+void Cluster::run(GMXTraj& traj){
+    _create_edges(traj);
+    _find_connected_component();
+
+    for (int i=0; i<edges.size();++i)
+        std::cout<< edges[i][0] <<  " " << edges[i][1]<<"\n";
+}
+
+void Cluster::_find_connected_component(){
+};
+
+void Cluster::_create_edges(GMXTraj& traj){
+
+    int i_sIDx, i_natoms, i_eIDx;
+    int j_sIDx, j_natoms, j_eIDx;
+    
+    for (int i =0; i< traj.nmolecules; ++i){
+        if (traj.molecule_trackers[i].name != molecule_name){
+            continue;
+        }
+        else {
+            i_sIDx = traj.molecule_trackers[i].sIDx;
+            i_natoms = traj.molecule_trackers[i].natoms; 
+            i_eIDx = i_sIDx + i_natoms; 
+            nodes.push_back(i);
+        }
+
+        for (int j=i+1; j<traj.nmolecules; ++j){
+            if (traj.molecule_trackers[j].name != molecule_name){
+                continue;
+            }
+            else {
+                j_sIDx = traj.molecule_trackers[j].sIDx;
+                j_natoms = traj.molecule_trackers[j].natoms; 
+                j_eIDx = j_sIDx + j_natoms; 
+            }
+            
+            bool is_neigh=false; 
+            for (int ii=i_sIDx; ii<i_eIDx;++ii){
+                for (int jj=j_sIDx; jj<j_eIDx; ++jj){
+                    float dx = traj.pos[ii][0] - traj.pos[jj][0];
+                    float dy = traj.pos[ii][1] - traj.pos[jj][1];
+                    float dz = traj.pos[ii][2] - traj.pos[jj][2];
+                    
+                    // apply PBC 
+                    dx = dx - traj.lx*round(dx/traj.lx);
+                    dy = dy - traj.ly*round(dy/traj.ly);
+                    dz = dz - traj.lz*round(dz/traj.lz);
+
+                    float dist = dx*dx + dy*dy + dz*dz; 
+
+                    if (dist < rcut*rcut){
+                        is_neigh = true; 
+                        break; 
+                    }
+                }
+                if (is_neigh) break;
+            }
+
+            if (is_neigh){
+                std::vector<int> neigh{i,j};
+                edges.emplace_back(std::move(neigh));
+            }
+        }
+    }
+
+}
+
+class Graph {
+/*
+ Algo for connected component from following source
+ https://cp-algorithms.com/graph/search-for-connected-components.html
+ */
+public:
+    std::map<int,std::vector<int>>adjList;
+    std::map<int,bool> visited; 
+    std::vector<int>nodes;
+    std::vector<std::vector<int>>connected_components; 
+    std::vector<int>subgraph; 
+    Graph(std::vector<int>nodes):nodes(nodes){
+        for (int a: nodes){
+            std::vector<int> _temp{};
+            adjList[a] = _temp;
+            visited[a] = false; 
+        }
+    }
+
+    void add_edges(int a, int b){
+        adjList[a].push_back(b);
+        adjList[b].push_back(a);
+    }
+
+    void find_connected_component(){
+        // set visited false 
+        for (auto node : nodes)
+            visited[node] = false;
+
+        for (auto node : nodes){
+            if (!visited[node]){
+                subgraph.clear();
+                DFS(node);
+                connected_components.push_back(subgraph);
+            }
+        }
+    }
+
+    void DFS(int node){
+        visited[node]=true; 
+        subgraph.push_back(node);
+
+        for (auto neigh : adjList[node])
+            if (!visited[neigh]) DFS(neigh);
+    }
+
+    void print(){
+        for (auto item: adjList){
+            auto key = item.first;
+            auto val = item.second; 
+
+            std::cout<<key+1<<" "; 
+            for (int i=0; i<val.size();++i)
+                std::cout<<val[i]+1<<" ";
+            std::cout<<"\n";
+            
+        }
+    }
+
+    void print_cluster(){
+        for(auto v : connected_components){
+            for (auto a: v)
+                std::cout << a+1 << " ";
+            std::cout <<"\n\n";
+        }
+    }
+
+};
+
+
+int main()
+{
+    GMXTraj traj{"final.gro"};
+
+    // create molecule summary 
+    std::vector<MoleculeSummary> molecule_summarys;
+    molecule_summarys.push_back(MoleculeSummary{"HSA",24,100});
+    molecule_summarys.push_back(MoleculeSummary{"OCT",8,4981});
+    traj.create_molecule_tracker(molecule_summarys);
+
+    traj.next();
+    /* traj.next(); */
+    /* traj.next(); */
+    /* traj.next(); */
+
+    /* for (int i=0;i<10;++i){ */
+    /*     std::cout<<traj.pos[i][0] << " "<<traj.pos[i][1] << " "<< traj.pos[i][2]<<"\n"; */
+    /* } */
+    /* std::cout << traj.lx<<"\n"; */
+
+    Cluster cluster{"HSA"};
+    cluster.run(traj);
+
+    Graph graph{cluster.nodes};
+    for (int i=0; i< cluster.edges.size();++i)
+        graph.add_edges(cluster.edges[i][0],cluster.edges[i][1]);
+
+    graph.find_connected_component();
+    graph.print_cluster();
+    return 0;
+}
+
