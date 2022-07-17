@@ -9,8 +9,7 @@
 #include<map>
 #include <cmath>
 #include <iostream>
-
-
+#include <limits>
 
 class Graph {
 public:
@@ -90,8 +89,6 @@ void Cluster::run(GMXTraj& traj){
     connected_components = std::move(graph.connected_components);
     
     nclusters=connected_components.size();
-    std::cout << "Cluster found: "<<nclusters<<"\n";
-
 }
 
 Cluster::~Cluster(){
@@ -172,6 +169,10 @@ void print_help(){
     std::cout << "    -s  topology file [gro]\n";
     std::cout << "    --mol-name  *name of molecule\n";
     std::cout << "    --sys-info  information about molecule counts [ascii file]\n";
+    std::cout << "    -dt  every dt ps  do analysis\n";
+    std::cout << "    -b  begin analysis [ps]\n";
+    std::cout << "    -e  end analysis [ps]\n";
+    std::cout << "    --max-frames  maxium number of frames\n";
     std::cout << "    -h/--help print this message\n";
 
     exit(0);
@@ -186,8 +187,13 @@ int main(int argc, char* argv[])
     std::string traj_file{""};
     std::string mol_name{""};
     std::string sys_info{""};
+    std::string log_file{"result_clust.log"};
     float rcut=0.35;
-    
+    float dt =1.0;
+    float begin = 0.0;
+    float end = std::numeric_limits<float>::max();   
+    float max_frame = std::numeric_limits<int>::max();   
+
     // Parse Command Line Argument 
     int i=1;
     while(i<argc && argv[i][0] == '-') {
@@ -197,6 +203,7 @@ int main(int argc, char* argv[])
         if(opt == "--mol-name") mol_name=argv[++i] ;
         if(opt == "--sys-info") sys_info=argv[++i] ;
         if(opt == "-rcut") rcut = atof(argv[++i]);
+        if(opt == "-o") log_file=argv[++i] ;
         if(opt == "-h") print_help();
         if(opt == "--help") print_help();
 
@@ -212,9 +219,21 @@ int main(int argc, char* argv[])
 
     Cluster cluster{mol_name};
     cluster.set_rcut(rcut);
+    
+    std::ofstream log; 
+    log.open(log_file);
+    log<< "# time   nclusters\n";
+    
+    int iFrame=0; 
+    while(traj.next()){
+        if (iFrame >= max_frame) break;
 
-    while(traj.next()){;
-        cluster.run(traj);
+        if (traj.time >= begin && traj.time <= end && std::fmod(traj.time,dt)<0.0001){
+            std::cout << "Time: "<< traj.time << " Frame: " << iFrame<<"\n"; 
+            cluster.run(traj);
+            log << traj.time << "   " << cluster.nclusters << "\n";
+            ++iFrame;
+        }
     }
     
     return 0;
