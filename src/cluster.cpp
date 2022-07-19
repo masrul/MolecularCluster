@@ -21,10 +21,9 @@ public:
     std::vector<int>subgraph; 
 
     Graph(std::vector<int>nodes):nodes(nodes){
-        for (int a: nodes){
-            std::vector<int> _temp{};
-            adjList[a] = _temp;
-            visited[a] = false; 
+        for (int node : nodes){
+            adjList[node] = std::vector<int>{};
+            visited[node] = false; 
         }
     }
 
@@ -33,7 +32,7 @@ public:
         adjList[b].push_back(a);
     }
 
-    void find_connected_component(){
+    void find_connected_components(){
         // set visited false 
         for (auto node : nodes)
             visited[node] = false;
@@ -56,6 +55,18 @@ private:
             if (!visited[neigh]) _DFS(neigh);
     }
 };
+
+void min_img_dx(float* dr,matrix& box){
+    for (int k=0;k<3;++k){
+        while (dr[k]>0.5*box[k][k] || dr[k]<-0.5*box[k][k]){
+            if (dr[k] > 0.5*box[k][k])
+                dr[k] -=box[k][k];
+            else if (dr[k] < -0.5*box[k][k])
+                dr[k] +=box[k][k];
+        }
+    }
+}
+
 
 
 class Cluster {
@@ -81,12 +92,24 @@ private:
 
 void Cluster::run(GMXTraj& traj){
 
-    // Creates nodes for Graph 
-    nodes.clear();
-    auto& mol_trackers = traj.molecule_trackers;
-    for (int i =0; i< traj.nmolecules; ++i)
-        if (mol_trackers[i].name == molecule_name) 
-            nodes.push_back(i);
+    // Creates nodes for Graph first invokation 
+    if ((nodes.size()==0)){
+        auto& trackers = traj.molecule_trackers;
+        for (int i =0; i< traj.nmolecules; ++i)
+            if (trackers[i].name == molecule_name) 
+                nodes.push_back(i);
+        
+        if (nodes.size()==0){
+            std::cout<<"Molecule with name("<<molecule_name<<") is not found!\n";
+            exit(0);
+        }
+        else {
+            std::cout<<molecule_name <<"  " 
+                <<trackers[nodes[0]].natoms << " "
+                <<nodes.size() 
+                << "\n";
+        }
+    }
 
     // Create edges for Graph 
     edges.clear();
@@ -96,9 +119,10 @@ void Cluster::run(GMXTraj& traj){
     Graph graph(nodes); 
     for (int i=0; i< edges.size();++i)
         graph.add_edges(edges[i][0],edges[i][1]);
-    graph.find_connected_component();
+    graph.find_connected_components();
     clusters = std::move(graph.connected_components);
     nClusters=clusters.size();
+
 
     // find max cluster size 
     max_cluster_size = 1; 
@@ -156,31 +180,73 @@ void Cluster::_create_edges(GMXTraj& traj){
 
 }
 
-bool Cluster::_is_neighbour(GMXTraj& traj, int i, int j){
+bool Cluster::_is_neighbour(GMXTraj& traj, int iMol, int jMol){
     auto& trackers = traj.molecule_trackers;
     auto& pos = traj.pos; 
     auto& box = traj.box; 
 
-    int i_sIDx = trackers[i].sIDx;
-    int i_eIDx = i_sIDx + trackers[i].natoms; 
+    int i_sIDx = trackers[iMol].sIDx;
+    int i_eIDx = i_sIDx + trackers[iMol].natoms; 
 
-    int j_sIDx = trackers[j].sIDx;
-    int j_eIDx = j_sIDx + trackers[j].natoms; 
+    int j_sIDx = trackers[jMol].sIDx;
+    int j_eIDx = j_sIDx + trackers[jMol].natoms; 
     float dr[3],dist;
 
+    // Check based on molecule  
+    if (trackers[iMol].natoms > 5){
+
+        // find i_max_dist 
+        float i_max_dist = 0.0; 
+        int jj = i_sIDx; 
+        for (int ii=i_sIDx+1; ii<i_eIDx;++ii){
+            for (int k=0;k<3;++k)
+                dr[k] = pos[ii][k] - pos[jj][k];
+            min_img_dx(dr,box);
+            dist =dr[0]*dr[0] + dr[1]*dr[1] + dr[2]*dr[2];
+            if (dist > i_max_dist)
+                i_max_dist = dist; 
+        }
+        i_max_dist = std::sqrt(dist);
+
+        // find j_max_dist 
+        float j_max_dist = 0.0; 
+        jj = j_sIDx; 
+        for (int ii=j_sIDx+1; ii<j_eIDx;++ii){
+            for (int k=0;k<3;++k)
+                dr[k] = pos[ii][k] - pos[jj][k];
+            min_img_dx(dr,box);
+            dist =dr[0]*dr[0] + dr[1]*dr[1] + dr[2]*dr[2];
+            if (dist > j_max_dist)
+                j_max_dist = dist; 
+        }
+        j_max_dist = std::sqrt(dist);
+
+        // find dist between mols 
+        for (int k=0;k<3;++k)
+            dr[k] = pos[i_sIDx][k] - pos[j_sIDx][k];
+        min_img_dx(dr,box);
+        float com_dist =dr[0]*dr[0] + dr[1]*dr[1] + dr[2]*dr[2];
+        com_dist = std::sqrt(com_dist);
+        
+        if (com_dist-i_max_dist -j_max_dist > rcut)
+            return false; 
+    }
+
+    // checked based on atoms 
     for (int ii=i_sIDx; ii<i_eIDx;++ii){
         for (int jj=j_sIDx; jj<j_eIDx; ++jj){
             dist = 0.0;
-            for (int k=0;k<3;++k){
+            for (int k=0;k<3;++k)
                 dr[k] = pos[ii][k] - pos[jj][k];
-                dr[k] = dr[k] - box[k][k]*round(dr[k]/box[k][k]);
-                dist +=dr[k]*dr[k];
-            }
+            min_img_dx(dr,box);
+            dist =dr[0]*dr[0] + dr[1]*dr[1] + dr[2]*dr[2];
             if (dist < rcut*rcut)return true; 
         }
     }
     return false; 
 }
+
+
 
 void print_help(){
     std::cout << "Cluster analysis\n";
@@ -263,12 +329,16 @@ int main(int argc, char* argv[]){
         if (nFrames >= max_frames || traj.time > end) break;
         if (traj.time < begin || std::fmod(traj.time,dt)>tol) continue; 
 
-        std::cout << "Time: "<< traj.time << " nFrames: " << nFrames<<"\n"; 
-
         cluster.run(traj);
+        std::cout 
+            <<"Time: "<< traj.time 
+            <<" nFrames: "<< nFrames
+            <<" nCluts: "<< cluster.nClusters
+            <<"\n"; 
+
         log <<std::fixed<<std::setw(12)<<std::setprecision(3)<<std::right<<traj.time
             <<std::fixed<<std::setw(10)<<std::right<<cluster.nClusters
-            <<std::fixed<<std::setw(10)<<std::right<<cluster.max_cluster_size
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.max_cluster_size*76
             <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[1]
             <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[2]
             <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[3]
