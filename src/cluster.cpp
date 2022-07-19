@@ -6,7 +6,7 @@
 
 #include "gmx_traj.hpp"
 #include <vector>
-#include<map>
+#include <map>
 #include <cmath>
 #include <iostream>
 #include <limits>
