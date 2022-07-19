@@ -10,6 +10,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <iomanip>
 
 class Graph {
 public:
@@ -18,6 +19,7 @@ public:
     std::vector<int>nodes;
     std::vector<std::vector<int>>connected_components; 
     std::vector<int>subgraph; 
+
     Graph(std::vector<int>nodes):nodes(nodes){
         for (int a: nodes){
             std::vector<int> _temp{};
@@ -39,18 +41,19 @@ public:
         for (auto node : nodes){
             if (!visited[node]){
                 subgraph.clear();
-                DFS(node);
+                _DFS(node);
                 connected_components.push_back(subgraph);
             }
         }
     }
 
-    void DFS(int node){
+private: 
+    void _DFS(int node){
         visited[node]=true; 
         subgraph.push_back(node);
 
         for (auto neigh : adjList[node])
-            if (!visited[neigh]) DFS(neigh);
+            if (!visited[neigh]) _DFS(neigh);
     }
 };
 
@@ -68,7 +71,6 @@ public:
     ~Cluster();
     void set_rcut(float);
     void run(GMXTraj&);
-
 
 private:
     std::vector<int> nodes;
@@ -231,8 +233,7 @@ int main(int argc, char* argv[]){
         if(opt == "-b") begin = atof(argv[++i]);
         if(opt == "-e") end = atof(argv[++i]);
         if(opt == "--max-frames") max_frames=atoi(argv[++i]) ;
-        if(opt == "-h") print_help();
-        if(opt == "--help") print_help();
+        if(opt == "-h" || opt == "--help") print_help();
 
         ++i ;
     }
@@ -249,26 +250,34 @@ int main(int argc, char* argv[]){
     
     std::ofstream log; 
     log.open(log_file);
-    log<< "# time   nClusters\n";
+    log<<std::setw(12)<<"#   Time[ps]"
+       <<std::setw(10)<<"nClusts"
+       <<std::setw(10)<<"max_size"
+       <<std::setw(10)<<"1mers"
+       <<std::setw(10)<<"2mers"
+       <<std::setw(10)<<"3mers"
+       <<std::setw(10)<<"4mers"
+       <<std::setw(10)<<"5mers"<<"\n";
     
-    int iFrame=0; 
+    int nFrames=0; 
+    float tol =0.00001; // tolarance for fmod
     while(traj.next()){
-        if (iFrame >= max_frames) break;
+        if (nFrames >= max_frames || traj.time > end) break;
+        if (traj.time < begin || std::fmod(traj.time,dt)>tol) continue; 
 
-        if (traj.time >= begin && traj.time <= end && std::fmod(traj.time,dt)<0.0001){
-            std::cout << "Time: "<< traj.time << " Frame: " << iFrame<<"\n"; 
-            cluster.run(traj);
-            log << traj.time << "   " 
-                << cluster.nClusters << "   " 
-                << cluster.max_cluster_size << "  "
-                << cluster.polymer_counts[1] << "  "
-                << cluster.polymer_counts[2] << "  "
-                << cluster.polymer_counts[3] << "  "
-                << cluster.polymer_counts[4] << "  "
-                << cluster.polymer_counts[5] << "  "
-                <<"\n";
-            ++iFrame;
-        }
+        std::cout << "Time: "<< traj.time << " nFrames: " << nFrames<<"\n"; 
+
+        cluster.run(traj);
+        log <<std::fixed<<std::setw(12)<<std::setprecision(3)<<std::right<<traj.time
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.nClusters
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.max_cluster_size
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[1]
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[2]
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[3]
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[4]
+            <<std::fixed<<std::setw(10)<<std::right<<cluster.polymer_counts[5]
+            <<"\n";
+        ++nFrames;
     }
     
     return 0;
