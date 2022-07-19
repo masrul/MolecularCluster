@@ -32,6 +32,10 @@ public:
     }
 
     void find_connected_component(){
+    /*
+     Algo for connected component from following source
+     https://cp-algorithms.com/graph/search-for-connected-components.html
+     */
         // set visited false 
         for (auto node : nodes)
             visited[node] = false;
@@ -87,10 +91,9 @@ void Cluster::run(GMXTraj& traj){
             nodes.push_back(i);
 
     // Create edges for Graph 
-    edges.clear();
     _create_edges(traj);
 
-    // find connected components/clusters using Graph/DFS   
+    // find connected components/clusters  
     Graph graph(nodes); 
     for (int i=0; i< edges.size();++i)
         graph.add_edges(edges[i][0],edges[i][1]);
@@ -127,78 +130,86 @@ void Cluster::set_rcut(float _rcut){
 
 
 void Cluster::_create_edges(GMXTraj& traj){
-    auto& trackers = traj.molecule_trackers;
+    edges.clear();
+
+    auto& mol_trackers = traj.molecule_trackers;
+    auto& pos = traj.pos; 
+    auto& box = traj.box; 
+
 
     #pragma omp  parallel 
     {
-        // private variables to threads 
+        int i_sIDx, i_natoms, i_eIDx;
+        int j_sIDx, j_natoms, j_eIDx;
+        std::vector<int> nodes_private;
         std::vector<std::vector<int>> edges_private; 
+        float dr[3],dist;
+
 
         #pragma omp for schedule(dynamic) 
         for (int i =0; i< traj.nmolecules; ++i){
-            if (trackers[i].name != molecule_name) continue;
+
+            if (mol_trackers[i].name != molecule_name) continue;
+            else {
+                i_sIDx = mol_trackers[i].sIDx;
+                i_natoms = mol_trackers[i].natoms; 
+                i_eIDx = i_sIDx + i_natoms; 
+            }
+
             for (int j=i+1; j<traj.nmolecules; ++j){
-                if (trackers[j].name != molecule_name) continue;
-                if (_is_neighbour(traj,i,j))
-                    edges_private.push_back(std::vector<int>{i,j});
+
+                if (mol_trackers[j].name != molecule_name) continue;
+                else {
+                    j_sIDx = mol_trackers[j].sIDx;
+                    j_natoms = mol_trackers[j].natoms; 
+                    j_eIDx = j_sIDx + j_natoms; 
+                }
+                
+                for (int ii=i_sIDx; ii<i_eIDx;++ii){
+                    for (int jj=j_sIDx; jj<j_eIDx; ++jj){
+                        
+                        dist = 0.0;
+                        for (int k=0;k<3;++k){
+                            dr[k] = pos[ii][k] - pos[jj][k];
+                            dr[k] = dr[k] - box[k][k]*round(dr[k]/box[k][k]);
+                            dist +=dr[k]*dr[k];
+                        }
+
+                        if (dist < rcut*rcut) {
+                            std::vector<int> neigh{i,j};
+                            edges_private.emplace_back(std::move(neigh));
+                            goto EndOfNeighCheck;
+                        }
+                    }
+                }
+                EndOfNeighCheck:{}; 
             }
         }
        
-        // Merging private copy of edges_private 
+        // Merging private copy of nodes and edges 
         #pragma omp critical  
         edges.insert(
             edges.end(), 
             std::make_move_iterator(edges_private.begin()), 
             std::make_move_iterator(edges_private.end())
         );
+
     } // end of omp parallel 
 
 }
 
-
-bool Cluster::_is_neighbour(GMXTraj& traj, int i, int j){
-    auto& trackers = traj.molecule_trackers;
-    auto& pos = traj.pos; 
-    auto& box = traj.box; 
-
-    int i_sIDx = trackers[i].sIDx;
-    int i_eIDx = i_sIDx + trackers[i].natoms; 
-
-    int j_sIDx = trackers[j].sIDx;
-    int j_eIDx = j_sIDx + trackers[j].natoms; 
-    float dr[3],dist;
-
-    for (int ii=i_sIDx; ii<i_eIDx;++ii){
-        for (int jj=j_sIDx; jj<j_eIDx; ++jj){
-            dist = 0.0;
-            for (int k=0;k<3;++k){
-                dr[k] = pos[ii][k] - pos[jj][k];
-                dr[k] = dr[k] - box[k][k]*round(dr[k]/box[k][k]);
-                dist +=dr[k]*dr[k];
-            }
-            if (dist < rcut*rcut)return true; 
-        }
-    }
-    return false; 
-}
-
 void print_help(){
-    std::cout << "Cluster analysis\n";
-    std::cout << "Author: Masrul Huda\n";
-    std::cout << "Version: 0.1\n\n";
+    std::cout << "Cluster analysis\n\n";
     
-    std::cout << "    -f            *trajectory file [GRO,XTC,TRR]\n";
-    std::cout << "    -s            topology file [gro] (required, if trajectory is XTC/TRR)\n";
-    std::cout << "    --mol-name    *name of molecule\n";
-    std::cout << "    --sys-info    information about molecule counts [ascii file]\n";
-    std::cout << "    -rcut         cutoff distance between atoms\n";
-    std::cout << "    -o            output file\n";
-    std::cout << "    -dt           every dt ps  do analysis\n";
-    std::cout << "    -b            begin analysis [ps]\n";
-    std::cout << "    -e            end analysis [ps]\n";
+    std::cout << "    -f  *trajectory file [gro,xtc,trr]\n";
+    std::cout << "    -s  topology file [gro] (required, if trajectory is XTC/TRR)\n";
+    std::cout << "    --mol-name  *name of molecule\n";
+    std::cout << "    --sys-info  information about molecule counts [ascii file]\n";
+    std::cout << "    -dt  every dt ps  do analysis\n";
+    std::cout << "    -b  begin analysis [ps]\n";
+    std::cout << "    -e  end analysis [ps]\n";
     std::cout << "    --max-frames  maxium number of frames\n";
-    std::cout << "    -h/--help     print this message\n";
-    std::cout << "\n* required\n";
+    std::cout << "    -h/--help print this message\n";
 
     exit(0);
 
@@ -227,9 +238,6 @@ int main(int argc, char* argv[]){
         if(opt == "--sys-info") sys_info=argv[++i] ;
         if(opt == "-rcut") rcut = atof(argv[++i]);
         if(opt == "-o") log_file=argv[++i] ;
-        if(opt == "-dt") dt = atof(argv[++i]);
-        if(opt == "-b") begin = atof(argv[++i]);
-        if(opt == "-e") end = atof(argv[++i]);
         if(opt == "--max-frames") max_frames=atoi(argv[++i]) ;
         if(opt == "-h") print_help();
         if(opt == "--help") print_help();
@@ -261,11 +269,11 @@ int main(int argc, char* argv[]){
             log << traj.time << "   " 
                 << cluster.nClusters << "   " 
                 << cluster.max_cluster_size << "  "
-                << cluster.polymer_counts[1] << "  "
-                << cluster.polymer_counts[2] << "  "
-                << cluster.polymer_counts[3] << "  "
-                << cluster.polymer_counts[4] << "  "
-                << cluster.polymer_counts[5] << "  "
+                /* << cluster.polymer_counts[1] << "  " */
+                /* << cluster.polymer_counts[2] << "  " */
+                /* << cluster.polymer_counts[3] << "  " */
+                /* << cluster.polymer_counts[4] << "  " */
+                /* << cluster.polymer_counts[5] << "  " */
                 <<"\n";
             ++iFrame;
         }

@@ -16,8 +16,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "-O2 -Wall  -std=c++11")
     set(CMAKE_C_FLAGS "-O2 -Wno-incompatible-function-pointer-types")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS " -fopenmp -O2 -Wno-incompatible-function-pointer-types")
-    set(CMAKE_C_FLAGS " -fopenmp -O2")
+    set(CMAKE_CXX_FLAGS " -fopenmp -g  -O2 -Wno-incompatible-function-pointer-types")
+    set(CMAKE_C_FLAGS " -fopenmp -g -O2")
 endif()
 
 
