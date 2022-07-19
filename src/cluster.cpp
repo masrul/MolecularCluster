@@ -127,7 +127,6 @@ void Cluster::set_rcut(float _rcut){
     rcut = _rcut;
 }
 
-
 void Cluster::_create_edges(GMXTraj& traj){
     auto& trackers = traj.molecule_trackers;
 
@@ -156,7 +155,6 @@ void Cluster::_create_edges(GMXTraj& traj){
     } // end of omp parallel 
 
 }
-
 
 bool Cluster::_is_neighbour(GMXTraj& traj, int i, int j){
     auto& trackers = traj.molecule_trackers;
