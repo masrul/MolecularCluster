@@ -13,10 +13,10 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # Optimization flag 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS "-O2 -Wall  -std=c++11")
+    set(CMAKE_CXX_FLAGS "-O2 -Wall  -std=c++17")
     set(CMAKE_C_FLAGS "-O2 -Wno-incompatible-function-pointer-types")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS " -fopenmp -g  -O2 -Wno-incompatible-function-pointer-types")
+    set(CMAKE_CXX_FLAGS " -fopenmp -g  -O2 -std=c++17  -Wno-incompatible-function-pointer-types")
     set(CMAKE_C_FLAGS " -fopenmp -g -O2")
 endif()
 
@@ -26,6 +26,7 @@ include(FindPkgConfig)
 pkg_search_module(GMXTRAJ REQUIRED libgmxtraj)
 
 include_directories(${GMXTRAJ_INCLUDE_DIRS})
+include_directories("./include/")
 link_directories (${GMXTRAJ_LIBRARY_DIRS})
-add_executable(${PROJECT_NAME} src/cluster.cpp)
+add_executable(${PROJECT_NAME}  src/cluster.cpp)
 target_link_libraries(${PROJECT_NAME} ${GMXTRAJ_LIBRARIES})
