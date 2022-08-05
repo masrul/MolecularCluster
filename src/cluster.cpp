@@ -1,9 +1,3 @@
-/**
- * Author      : Masrul Huda (mail2masrul@gmail.com)
- * Host        : iMacPro@Swalm
- * Created     : Tuesday Jul 05, 2022 10:01:02 CDT
- */
-
 #include <vector>
 #include <map>
 #include <cmath>
@@ -62,8 +56,6 @@ public:
         sequence_ref.clear();
         _BFS(node);
     }
-
-
 
 private: 
     void _DFS(int node){
@@ -157,12 +149,10 @@ void Cluster::run(){
     _create_edges();
     graph.add_edges(edges);
 
-
     // find connected components/clusters using Graph/DFS   
     graph.find_connected_components();
     clusters = std::move(graph.connected_components);
     nClusts=clusters.size();
-
 
     // find max cluster size 
     max_clust_size = 1; 
@@ -178,12 +168,9 @@ void Cluster::run(){
     for (auto clust : clusters)
         if (clust.size() <= 5)
             ++polymer_counts[clust.size()]; 
-   
 }
 
 void Cluster::dump_max_clust(std::string prefix){
-    std::string dump_file_name = prefix + "_"+std::to_string(traj->time) + ".gro";
-
     
     // Find max cluster information 
     int max_clust_id; 
@@ -194,6 +181,8 @@ void Cluster::dump_max_clust(std::string prefix){
             max_clust_size = clusters[i].size();
         }
     }
+    
+    std::string dump_file_name = prefix + "_"+std::to_string(traj->time) + ".gro";
     _dump_clust(max_clust_id,dump_file_name);
 }
 
@@ -374,9 +363,6 @@ bool Cluster::_is_neighbour(int iMol, int jMol){
 }
 
 
-
-
-
 void print_help(){
     std::cout << "Cluster analysis\n";
     std::cout << "Author: Masrul Huda\n";
@@ -398,7 +384,6 @@ void print_help(){
     std::cout << "\n* required\n";
 
     exit(0);
-
 }
 
 
@@ -444,13 +429,15 @@ int main(int argc, char* argv[]){
         exit(0);
     }
 
-
+    // Create trajectory 
     GMXTraj traj{traj_file,top_file};
     traj.create_molecule_tracker(sys_info);
-
+    
+    // Create cluster analysis instance 
     Cluster cluster{&traj,mol_name};
     cluster.set_rcut(rcut);
     
+    // Write to log 
     std::ofstream log; 
     log.open(log_file);
     log<<std::setw(12)<<"#   Time[ps]"
@@ -462,6 +449,7 @@ int main(int argc, char* argv[]){
        <<std::setw(10)<<"4mers"
        <<std::setw(10)<<"5mers"<<"\n";
     
+    // Traverse trajectory and do analysis 
     int nFrames=0; 
     float tol =0.00001; // tolarance for fmod
     while(traj.next()){
