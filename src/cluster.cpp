@@ -5,8 +5,15 @@
 #include <limits>
 #include <iomanip>
 #include <queue>
+#include "ctime"
+
 #include "gmx_traj.hpp"
 #include "distance.hpp"
+#include "timer.hpp"
+
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
 
 class Graph {
 public:
@@ -101,6 +108,7 @@ public:
     std::vector<std::vector<int>> clusters; 
     Graph graph{}; 
 
+
     Cluster(GMXTraj* _traj,std::string _molecule_name){
         molecule_name=_molecule_name;
         traj=_traj;
@@ -141,7 +149,12 @@ void Cluster::run(){
             std::cout<<"Molecule name: "<<molecule_name<<"\n";
             std::cout<<"Number of molecules found: "<<nodes.size()<<"\n";
             std::cout<<"Number of atoms per molecule: "<<_natoms_per_mol<<"\n";
+#if defined(_OPENMP)
+            size_t num_threads = omp_get_max_threads( );
+            std::cout<<"Number of threads used: "<<num_threads<<"\n";
+#endif 
             std::cout<<"\nStarting analysis ....\n\n";
+
         }
     }
 
@@ -388,6 +401,8 @@ void print_help(){
 
 
 int main(int argc, char* argv[]){  
+    //Start a timer 
+    Timer timer{};
 
     std::string top_file{""};
     std::string traj_file{""};
@@ -476,6 +491,9 @@ int main(int argc, char* argv[]){
             <<"\n";
         ++nFrames;
     }
+
+    // Print elapsed time 
+    timer.print_elapsed_time();
     
     return 0;
 }
