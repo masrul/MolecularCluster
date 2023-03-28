@@ -19,6 +19,13 @@ This tool kit finds the number of clusters/aggregations form during molecular si
     -h/--help           print this message
                         * required
                         
+## Algorithm
+Graph theory is used to find number of cluster. Following is the steps
++ Find neighbours
++ Use each molecule as node and neighbour as edge of graph.
++ Applied Breadth first search (BFS) to find disjoint set graph, which refers to a cluster
+
+                        
 ## Installation
 ```bash 
 git clone https://github.com/masrul/MolecularCluster/
