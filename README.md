@@ -25,7 +25,7 @@ This tool kit finds the number of clusters/aggregations formed during molecular 
                        
                         
 ## Algorithm
-Graph theory is used to find number of cluster. Following is the steps
+Graph theory is used to find number of cluster.
 + Find neighbours
 + Use each molecule as node and neighbour as edge of graph.
 + Applied Breadth first search (BFS) to find disjoint set graph, which refers to a cluster
