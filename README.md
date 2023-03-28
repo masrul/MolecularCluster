@@ -1,6 +1,6 @@
 # MolecularCluster
 
-This tool kit finds the number of clusters/aggregations form during molecular simulation. 
+This tool kit finds the number of clusters/aggregations formed during molecular simulation. 
 
 ## Options 
 
