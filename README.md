@@ -18,6 +18,11 @@ This tool kit finds the number of clusters/aggregations form during molecular si
     --max-clust-prefix  Prefix of max clust files
     -h/--help           print this message
                         * required
+  Number of threads can be assigned using 
+  ```
+  export OMP_NUMBER_THREADS=N  # N = nThreads
+  ```
+                       
                         
 ## Algorithm
 Graph theory is used to find number of cluster. Following is the steps
