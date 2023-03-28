@@ -20,7 +20,7 @@ This tool kit finds the number of clusters/aggregations formed during molecular 
                         * required
   Number of threads can be assigned using 
   ```
-  export OMP_NUMBER_THREADS=N  # N = nThreads
+  export OMP_NUM_THREADS=N  # N = nThreads
   ```
                        
                         
